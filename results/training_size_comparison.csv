@@ -1,0 +1,2 @@
+Training size per file,Accuracy,Precision,Recall,F1,False positives,Missed attacks,True negatives,True positives
+100000,0.7918669295000996,0.9972145872190046,0.6347801635592493,0.7757525426802785,227,46758,97491,81269

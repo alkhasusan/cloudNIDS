@@ -1,0 +1,40 @@
+{
+    "training_files": [
+        "Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv",
+        "Friday-WorkingHours-Morning.pcap_ISCX.csv",
+        "Monday-WorkingHours.pcap_ISCX.csv",
+        "Thursday-WorkingHours-Afternoon-Infilteration.pcap_ISCX.csv",
+        "Thursday-WorkingHours-Morning-WebAttacks.pcap_ISCX.csv",
+        "Tuesday-WorkingHours.pcap_ISCX.csv",
+        "Wednesday-workingHours.pcap_ISCX.csv"
+    ],
+    "heldout_file": "Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv",
+    "training_rows": 137464,
+    "heldout_rows": 225745,
+    "features": 78,
+    "selected_threshold": 0.5,
+    "validation_metrics": {
+        "threshold": 0.5,
+        "accuracy": 0.9980358636743898,
+        "precision": 0.991809572562068,
+        "recall": 0.9943546317680267,
+        "f1": 0.9930804715530497
+    },
+    "heldout_metrics": {
+        "threshold": 0.5,
+        "accuracy": 0.7914549602427517,
+        "precision": 0.9976393345874368,
+        "recall": 0.633780374452264,
+        "f1": 0.775133740924723
+    },
+    "confusion_matrix": [
+        [
+            97526,
+            192
+        ],
+        [
+            46886,
+            81141
+        ]
+    ]
+}
