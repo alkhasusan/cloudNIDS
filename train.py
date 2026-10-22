@@ -22,7 +22,7 @@ from sklearn.pipeline import Pipeline
 
 
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = Path(r"C:\Users\duvvu\Downloads\cloudNIDS\data\MachineLearningCSV")
+DATA_DIR = BASE_DIR / "data" / "MachineLearningCSV"
 MODEL_DIR = BASE_DIR / "models"
 RESULT_DIR = BASE_DIR / "results"
 

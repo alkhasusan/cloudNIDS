@@ -1,5 +1,6 @@
 
 from pathlib import Path
+from typing import Optional, Union
 
 import joblib
 import numpy as np
@@ -7,23 +8,19 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-MODEL_PATH = BASE_DIR / "models" / "cloudnids_binary_tuned.joblib"
+BASE_DIR = Path(__file__).resolve().parents[1]
+MODEL_PATH = BASE_DIR / "models" / "cloudnids_multiclass.joblib"
 
 saved = joblib.load(MODEL_PATH)
 model = saved["pipeline"]
 feature_cols = saved["feature_cols"]
-threshold = float(saved.get("threshold", 0.5))
+class_names = list(saved["class_names"])
 
-classes = list(model.named_steps["model"].classes_)
-benign_index = classes.index(0)
-malicious_index = classes.index(1)
-
-app = FastAPI(title="CloudNIDS API")
+app = FastAPI(title="CloudNIDS Multiclass API")
 
 
 class FlowData(BaseModel):
-    features: dict[str, float | int | None]
+    features: dict[str, Optional[Union[float, int]]]
 
 
 class BatchFlowData(BaseModel):
@@ -48,21 +45,24 @@ def predict_flows(flows):
 
     data = pd.DataFrame(rows, columns=feature_cols)
     probabilities = model.predict_proba(data)
+    predictions = model.predict(data)
 
     results = []
 
-    for probability in probabilities:
-        malicious = float(probability[malicious_index])
-        benign = float(probability[benign_index])
+    for prediction, probability in zip(predictions, probabilities):
+        class_probabilities = {
+            str(name): round(float(probability[index]), 6)
+            for index, name in enumerate(model.classes_)
+        }
 
         results.append({
-            "prediction": (
-                "MALICIOUS" if malicious >= threshold else "BENIGN"
-            ),
-            "malicious_probability": round(malicious, 4),
-            "benign_probability": round(benign, 4),
-            "threshold": threshold,
-            "warning": "Experimental model; predictions may be incorrect."
+            "prediction": str(prediction),
+            "confidence": round(float(np.max(probability)), 4),
+            "class_probabilities": class_probabilities,
+            "warning": (
+                "Experimental model; predictions may be incorrect. "
+                "Not validated for real-world security monitoring."
+            )
         })
 
     return results
@@ -73,6 +73,9 @@ def home():
     return {
         "project": "CloudNIDS",
         "status": "running",
+        "classification": "multiclass",
+        "class_count": len(class_names),
+        "classes": class_names,
         "feature_count": len(feature_cols)
     }
 
