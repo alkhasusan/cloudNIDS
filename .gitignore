@@ -228,3 +228,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+.venv/
+.venv-model/
+__pycache__/
+*.py[cod]
