@@ -1,4 +1,3 @@
-
 from pathlib import Path
 from typing import Optional, Union
 
@@ -11,9 +10,14 @@ from pydantic import BaseModel, Field
 BASE_DIR = Path(__file__).resolve().parents[1]
 MODEL_PATH = BASE_DIR / "models" / "cloudnids_multiclass.joblib"
 
+if not MODEL_PATH.exists():
+    raise FileNotFoundError(
+        f"Model not found at {MODEL_PATH}. Run train.py before starting the API."
+    )
+
 saved = joblib.load(MODEL_PATH)
 model = saved["pipeline"]
-feature_cols = saved["feature_cols"]
+feature_cols = list(saved["feature_cols"])
 class_names = list(saved["class_names"])
 
 app = FastAPI(title="CloudNIDS Multiclass API")
@@ -37,8 +41,8 @@ def predict_flows(flows):
                 detail="Each flow must contain at least one feature."
             )
 
-        row = pd.DataFrame([flow.features])
-        row = row.reindex(columns=feature_cols)
+        # Only selected training features are passed to the model.
+        row = pd.DataFrame([flow.features]).reindex(columns=feature_cols)
         row = row.apply(pd.to_numeric, errors="coerce")
         row = row.replace([np.inf, -np.inf], np.nan)
         rows.append(row.iloc[0])
@@ -48,13 +52,13 @@ def predict_flows(flows):
     predictions = model.predict(data)
 
     results = []
+    model_classes = list(model.classes_)
 
     for prediction, probability in zip(predictions, probabilities):
         class_probabilities = {
             str(name): round(float(probability[index]), 6)
-            for index, name in enumerate(model.classes_)
+            for index, name in enumerate(model_classes)
         }
-
         results.append({
             "prediction": str(prediction),
             "confidence": round(float(np.max(probability)), 4),
@@ -76,7 +80,9 @@ def home():
         "classification": "multiclass",
         "class_count": len(class_names),
         "classes": class_names,
-        "feature_count": len(feature_cols)
+        "feature_count": len(feature_cols),
+        "original_feature_count": saved.get("original_feature_count"),
+        "selected_feature_count": saved.get("selected_feature_count", len(feature_cols))
     }
 
 

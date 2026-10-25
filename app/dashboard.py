@@ -1,3 +1,4 @@
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -15,6 +16,7 @@ from sklearn.metrics import (
 API_URL = "http://127.0.0.1:8000"
 BATCH_SIZE = 100
 CHUNK_SIZE = 50000
+RESULT_DIR = Path(__file__).resolve().parent.parent / "results"
 
 st.set_page_config(
     page_title="CloudNIDS Multiclass",
@@ -56,7 +58,6 @@ def normalize_label(label):
     """Map CIC-IDS2017 labels to the trained model's class names."""
     value = str(label).strip()
     key = value.casefold()
-    key = key.replace("\ufffd", "-")
     key = key.replace("\u2013", "-").replace("\u2014", "-")
     key = " ".join(key.split())
 
@@ -73,28 +74,20 @@ def normalize_label(label):
         "bot": "Bot",
         "infiltration": "Infiltration",
         "heartbleed": "Heartbleed",
-        "web attack - brute force": "Web Attack \ufffd Brute Force",
-        "web attack - sql injection": "Web Attack \ufffd Sql Injection",
-        "web attack - xss": "Web Attack \ufffd XSS",
+        "web attack - brute force": "Web Attack - Brute Force",
+        "web attack - sql injection": "Web Attack - SQL Injection",
+        "web attack - xss": "Web Attack - XSS",
     }
-
     return mapping.get(key, value)
-
 
 
 def load_sample(file, sample_size):
     """Create a reproducible sample that includes rare attack classes."""
     file.seek(0)
-
     chunks = []
     total_rows = 0
 
-    # Read the CSV in chunks and count all rows.
-    for chunk in pd.read_csv(
-        file,
-        chunksize=CHUNK_SIZE,
-        low_memory=False,
-    ):
+    for chunk in pd.read_csv(file, chunksize=CHUNK_SIZE, low_memory=False):
         chunk.columns = chunk.columns.str.strip()
         total_rows += len(chunk)
         chunks.append(chunk)
@@ -103,45 +96,30 @@ def load_sample(file, sample_size):
         return pd.DataFrame(), 0
 
     df = pd.concat(chunks, ignore_index=True)
-
-    # Find the actual label column.
     label_col = next(
         (col for col in df.columns if col.strip().casefold() == "label"),
         None,
     )
 
-    # If labels are unavailable, use ordinary random sampling.
     if label_col is None:
-        sample = df.sample(
-            n=min(sample_size, len(df)),
-            random_state=42,
-        )
+        sample = df.sample(n=min(sample_size, len(df)), random_state=42)
         return sample.reset_index(drop=True), total_rows
 
-    # Sample each class separately so rare attacks are included.
     groups = list(df.groupby(label_col, dropna=False, sort=False))
     if not groups:
         return df.head(sample_size).reset_index(drop=True), total_rows
 
+    # Proportional class sampling with a minimum opportunity for rare classes.
     per_class = max(1, sample_size // len(groups))
     samples = []
-
     for _, group in groups:
-        samples.append(
-            group.sample(
-                n=min(per_class, len(group)),
-                random_state=42,
-            )
-        )
+        samples.append(group.sample(n=min(per_class, len(group)), random_state=42))
 
     result = pd.concat(samples, axis=0)
-
-    # Fill any remaining sample slots without duplicating rows.
     remaining_count = sample_size - len(result)
 
     if remaining_count > 0:
         remaining_df = df.loc[~df.index.isin(result.index)]
-
         if not remaining_df.empty:
             extra = remaining_df.sample(
                 n=min(remaining_count, len(remaining_df)),
@@ -150,7 +128,6 @@ def load_sample(file, sample_size):
             result = pd.concat([result, extra], axis=0)
 
     result = result.sample(frac=1, random_state=42).reset_index(drop=True)
-
     return result, total_rows
 
 
@@ -162,10 +139,7 @@ if uploaded_file is not None:
 
     try:
         with st.spinner("Reading and sampling the complete CSV..."):
-            df, total_file_rows = load_sample(
-                uploaded_file,
-                int(max_rows),
-            )
+            df, total_file_rows = load_sample(uploaded_file, int(max_rows))
 
         label_col = next(
             (col for col in df.columns if col.casefold() == "label"),
@@ -177,21 +151,52 @@ if uploaded_file is not None:
         st.write(f"Rows sampled for analysis: {len(df):,}")
         st.dataframe(df.head(10), use_container_width=True)
 
+        # Correlation heatmap uses numeric input columns, never the target label.
+        st.subheader("Feature Correlation Heatmap")
+        excluded = [
+            "Label", "target", "Flow ID", "Source IP",
+            "Destination IP", "Timestamp", "Unnamed: 0",
+            "_CloudNIDS_Normalized_Label",
+        ]
+        numeric_df = (
+            df.drop(columns=excluded, errors="ignore")
+            .apply(pd.to_numeric, errors="coerce")
+            .replace([np.inf, -np.inf], np.nan)
+        )
+        numeric_df = numeric_df.dropna(axis=1, how="all")
+
+        if numeric_df.shape[1] >= 2:
+            variances = numeric_df.var().dropna()
+            top_features = variances.nlargest(15).index.tolist()
+            if len(top_features) >= 2:
+                corr = numeric_df[top_features].corr()
+                fig = px.imshow(
+                    corr,
+                    x=corr.columns,
+                    y=corr.index,
+                    zmin=-1,
+                    zmax=1,
+                    color_continuous_scale="RdBu",
+                    aspect="auto",
+                    title="Correlation Between Numeric Features",
+                    labels={"x": "Feature", "y": "Feature", "color": "Correlation"},
+                )
+                fig.update_layout(height=650, xaxis_tickangle=-45)
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Not enough numeric features for a correlation heatmap.")
+
         if label_col:
             df[label_col] = df[label_col].astype(str).str.strip()
-
             st.subheader("Actual labels in sampled rows")
             label_counts = (
-                df[label_col]
-                .value_counts(dropna=False)
+                df[label_col].value_counts(dropna=False)
                 .rename_axis("Actual Label")
                 .reset_index(name="Number of Rows")
             )
             st.dataframe(label_counts, use_container_width=True)
 
-            normalized = df[label_col].map(normalize_label)
-            df["_CloudNIDS_Normalized_Label"] = normalized
-
+            df["_CloudNIDS_Normalized_Label"] = df[label_col].map(normalize_label)
             filters = ["All flows", "BENIGN only", "Attack only"]
         else:
             st.warning(
@@ -200,19 +205,12 @@ if uploaded_file is not None:
             )
             filters = ["All flows"]
 
-        selected_filter = st.selectbox(
-            "Flows to analyse",
-            filters,
-        )
+        selected_filter = st.selectbox("Flows to analyse", filters)
 
         if label_col and selected_filter == "BENIGN only":
-            analysis_df = df[
-                df["_CloudNIDS_Normalized_Label"] == "BENIGN"
-            ].copy()
+            analysis_df = df[df["_CloudNIDS_Normalized_Label"] == "BENIGN"].copy()
         elif label_col and selected_filter == "Attack only":
-            analysis_df = df[
-                df["_CloudNIDS_Normalized_Label"] != "BENIGN"
-            ].copy()
+            analysis_df = df[df["_CloudNIDS_Normalized_Label"] != "BENIGN"].copy()
         else:
             analysis_df = df.copy()
 
@@ -227,7 +225,6 @@ if uploaded_file is not None:
             progress = st.progress(0)
             status = st.empty()
 
-            # Do not send the dataset label to the prediction API.
             excluded_cols = [label_col] if label_col else []
             excluded_cols.append("_CloudNIDS_Normalized_Label")
 
@@ -236,16 +233,9 @@ if uploaded_file is not None:
                 flows = []
 
                 for _, row in chunk.iterrows():
-                    features = row.drop(
-                        labels=excluded_cols,
-                        errors="ignore",
-                    )
-                    features = features.replace(
-                        [np.inf, -np.inf], np.nan
-                    )
-                    features = features.astype(object).where(
-                        features.notna(), None
-                    )
+                    features = row.drop(labels=excluded_cols, errors="ignore")
+                    features = features.replace([np.inf, -np.inf], np.nan)
+                    features = features.astype(object).where(features.notna(), None)
                     flows.append({"features": features.to_dict()})
 
                 try:
@@ -259,8 +249,7 @@ if uploaded_file is not None:
 
                     if len(batch_results) != len(flows):
                         st.error(
-                            "API returned a different number of "
-                            "predictions than input flows."
+                            "API returned a different number of predictions than input flows."
                         )
                         st.stop()
 
@@ -268,59 +257,39 @@ if uploaded_file is not None:
 
                 except requests.RequestException as exc:
                     if exc.response is not None:
-                        st.error(
-                            f"API error {exc.response.status_code}"
-                        )
+                        st.error(f"API error {exc.response.status_code}")
                         st.code(exc.response.text)
                     else:
                         st.error(f"Could not contact API: {exc}")
                     st.stop()
 
-                completed = min(
-                    start + len(chunk),
-                    len(analysis_df),
-                )
+                completed = min(start + len(chunk), len(analysis_df))
                 progress.progress(completed / len(analysis_df))
-                status.write(
-                    f"Analysed {completed:,} of "
-                    f"{len(analysis_df):,} flows"
-                )
+                status.write(f"Analysed {completed:,} of {len(analysis_df):,} flows")
 
             result_df = pd.DataFrame(results).reset_index(drop=True)
             output_df = analysis_df.reset_index(drop=True).copy()
-
             output_df["Predicted Class"] = result_df["prediction"]
             output_df["Confidence"] = result_df["confidence"]
 
             probabilities = pd.DataFrame(
                 result_df["class_probabilities"].tolist()
             ).add_prefix("Probability: ")
-
-            output_df = pd.concat(
-                [output_df, probabilities],
-                axis=1,
-            )
+            output_df = pd.concat([output_df, probabilities], axis=1)
 
             st.session_state["cloudnids_results"] = output_df
             st.session_state["cloudnids_label_col"] = label_col
             st.session_state["cloudnids_filter"] = selected_filter
             st.session_state["cloudnids_filename"] = uploaded_file.name
 
-    except (
-        pd.errors.ParserError,
-        UnicodeDecodeError,
-        ValueError,
-        OSError,
-    ) as exc:
+    except (pd.errors.ParserError, UnicodeDecodeError, ValueError, OSError) as exc:
         st.error(f"Could not read the uploaded CSV: {exc}")
 
 
 if "cloudnids_results" in st.session_state:
     output_df = st.session_state["cloudnids_results"]
     label_col = st.session_state.get("cloudnids_label_col")
-    saved_filter = st.session_state.get(
-        "cloudnids_filter", "All flows"
-    )
+    saved_filter = st.session_state.get("cloudnids_filter", "All flows")
 
     st.divider()
     st.subheader("Multiclass prediction summary")
@@ -336,18 +305,14 @@ if "cloudnids_results" in st.session_state:
     c2.metric("Predicted BENIGN", f"{benign_count:,}")
     c3.metric("Predicted attack flows", f"{attack_count:,}")
 
-    distribution = (
-        counts.rename_axis("Predicted Class")
-        .reset_index(name="Count")
-    )
-
+    distribution = counts.rename_axis("Predicted Class").reset_index(name="Count")
     st.plotly_chart(
         px.bar(
             distribution,
             x="Predicted Class",
             y="Count",
             color="Predicted Class",
-            title="Predicted traffic by class",
+            title="Predicted Traffic by Class",
         ),
         use_container_width=True,
     )
@@ -357,14 +322,28 @@ if "cloudnids_results" in st.session_state:
             output_df,
             x="Confidence",
             nbins=20,
-            title="Prediction confidence distribution",
+            title="Prediction Confidence Distribution",
         ),
         use_container_width=True,
     )
 
+    importance_path = RESULT_DIR / "feature_importance.csv"
+    if importance_path.exists():
+        importance_df = pd.read_csv(importance_path)
+        if not importance_df.empty:
+            st.subheader("Most Important Selected Features")
+            fig = px.bar(
+                importance_df.head(20).sort_values("Importance"),
+                x="Importance",
+                y="Feature",
+                orientation="h",
+                title="Random Forest Feature Importance",
+            )
+            fig.update_layout(height=600)
+            st.plotly_chart(fig, use_container_width=True)
+
     st.subheader("Prediction results")
     st.dataframe(output_df, use_container_width=True)
-
     st.download_button(
         "Download prediction results (CSV)",
         data=output_df.to_csv(index=False).encode("utf-8"),
@@ -386,16 +365,12 @@ if "cloudnids_results" in st.session_state:
 
         accuracy = accuracy_score(actual, predicted)
         macro_f1 = f1_score(
-            actual, predicted,
-            labels=labels,
-            average="macro",
-            zero_division=0,
+            actual, predicted, labels=labels,
+            average="macro", zero_division=0,
         )
         weighted_f1 = f1_score(
-            actual, predicted,
-            labels=labels,
-            average="weighted",
-            zero_division=0,
+            actual, predicted, labels=labels,
+            average="weighted", zero_division=0,
         )
 
         m1, m2, m3 = st.columns(3)
@@ -405,32 +380,52 @@ if "cloudnids_results" in st.session_state:
 
         if actual.nunique() < 2:
             st.warning(
-                "This sample contains only one actual class. "
-                "These metrics do not demonstrate detection across "
-                "multiple attack types."
+                "This sample contains only one actual class. These metrics "
+                "do not demonstrate detection across multiple attack types."
             )
 
         st.markdown("**Classification report**")
         report = classification_report(
-            actual,
-            predicted,
-            labels=labels,
-            output_dict=True,
-            zero_division=0,
+            actual, predicted, labels=labels,
+            output_dict=True, zero_division=0,
         )
-        st.dataframe(
-            pd.DataFrame(report).transpose(),
-            use_container_width=True,
-        )
+        report_df = pd.DataFrame(report).transpose()
+        st.dataframe(report_df, use_container_width=True)
 
-        st.markdown("**Confusion matrix**")
-        matrix = confusion_matrix(actual, predicted, labels=labels)
-        matrix_df = pd.DataFrame(
-            matrix,
-            index=[f"Actual: {name}" for name in labels],
-            columns=[f"Predicted: {name}" for name in labels],
+        class_metrics = (
+            report_df.loc[
+                [name for name in labels if name in report_df.index],
+                ["precision", "recall", "f1-score"],
+            ]
+            .reset_index(names="Class")
+            .melt(id_vars="Class", var_name="Metric", value_name="Score")
         )
-        st.dataframe(matrix_df, use_container_width=True)
+        fig = px.bar(
+            class_metrics,
+            x="Class",
+            y="Score",
+            color="Metric",
+            barmode="group",
+            title="Per-Class Precision, Recall and F1-Score",
+            range_y=[0, 1],
+        )
+        fig.update_layout(height=550, xaxis_tickangle=-45)
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown("**Confusion Matrix Heatmap**")
+        matrix = confusion_matrix(actual, predicted, labels=labels)
+        fig = px.imshow(
+            matrix,
+            x=labels,
+            y=labels,
+            text_auto=True,
+            color_continuous_scale="Blues",
+            aspect="auto",
+            labels={"x": "Predicted class", "y": "Actual class", "color": "Flows"},
+            title="Actual vs Predicted Classes",
+        )
+        fig.update_layout(height=650, xaxis_tickangle=-45)
+        st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("**Actual vs predicted classes**")
         comparison = pd.crosstab(
@@ -438,11 +433,5 @@ if "cloudnids_results" in st.session_state:
             predicted.rename("Predicted class"),
         )
         st.dataframe(comparison, use_container_width=True)
-        st.write("Unique raw labels:", sorted(df[label_col].unique().tolist()))
-        st.write("Normalized label counts:")
-        st.write(df["_CloudNIDS_Normalized_Label"].value_counts(dropna=False))
 else:
-    st.write(
-        "Upload a CIC-IDS2017 CSV to preview the data "
-        "and run multiclass predictions."
-    )
+    st.write("Upload a CIC-IDS2017 CSV to preview the data and run multiclass predictions.")

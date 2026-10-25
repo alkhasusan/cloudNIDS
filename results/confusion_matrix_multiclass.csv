@@ -1,0 +1,13 @@
+,BENIGN,Bot,DDoS,DoS,FTP-Patator,Heartbleed,Infiltration,PortScan,SSH-Patator,Web Attack � Brute Force,Web Attack � Sql Injection,Web Attack � XSS
+BENIGN,25120,3,0,4,0,0,0,17,0,6,0,1
+Bot,7,31,0,0,0,0,0,0,0,0,0,0
+DDoS,1,0,2289,0,0,0,0,0,0,0,0,0
+DoS,10,0,0,1152,0,0,0,0,0,0,0,0
+FTP-Patator,0,0,0,0,64,0,0,0,0,0,0,0
+Heartbleed,0,0,0,0,0,2,0,0,0,0,0,0
+Infiltration,3,0,0,0,0,0,4,0,0,0,0,0
+PortScan,6,0,0,0,0,0,0,2086,0,0,0,0
+SSH-Patator,1,0,0,0,0,0,0,0,41,0,0,0
+Web Attack � Brute Force,9,0,0,0,0,0,0,0,0,25,1,4
+Web Attack � Sql Injection,0,0,0,2,0,0,0,0,0,1,1,0
+Web Attack � XSS,5,0,0,0,0,0,0,0,0,7,0,3

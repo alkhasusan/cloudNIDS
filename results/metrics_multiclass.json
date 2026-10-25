@@ -1,0 +1,160 @@
+{
+    "task": "multiclass intrusion detection",
+    "accuracy": 0.9971526564421148,
+    "accuracy_percent": 99.72,
+    "macro_precision": 0.8677380105084441,
+    "macro_recall": 0.7867742504106333,
+    "macro_f1": 0.8164596341993143,
+    "weighted_f1": 0.9970257463509359,
+    "training_records": 123621,
+    "testing_records": 30906,
+    "original_features": 78,
+    "features": 30,
+    "selected_features": [
+        "Destination Port",
+        "Flow Duration",
+        "Total Length of Fwd Packets",
+        "Total Length of Bwd Packets",
+        "Fwd Packet Length Max",
+        "Fwd Packet Length Mean",
+        "Bwd Packet Length Max",
+        "Bwd Packet Length Mean",
+        "Flow Bytes/s",
+        "Flow Packets/s",
+        "Flow IAT Max",
+        "Fwd IAT Total",
+        "Fwd IAT Mean",
+        "Fwd IAT Max",
+        "Fwd Header Length",
+        "Bwd Header Length",
+        "Fwd Packets/s",
+        "Bwd Packets/s",
+        "Max Packet Length",
+        "Packet Length Mean",
+        "Packet Length Std",
+        "Packet Length Variance",
+        "Average Packet Size",
+        "Avg Fwd Segment Size",
+        "Avg Bwd Segment Size",
+        "Fwd Header Length.1",
+        "Subflow Fwd Bytes",
+        "Subflow Bwd Bytes",
+        "Init_Win_bytes_forward",
+        "Init_Win_bytes_backward"
+    ],
+    "classes": [
+        "BENIGN",
+        "Bot",
+        "DDoS",
+        "DoS",
+        "FTP-Patator",
+        "Heartbleed",
+        "Infiltration",
+        "PortScan",
+        "SSH-Patator",
+        "Web Attack \ufffd Brute Force",
+        "Web Attack \ufffd Sql Injection",
+        "Web Attack \ufffd XSS"
+    ],
+    "test_class_distribution": {
+        "BENIGN": 25151,
+        "DDoS": 2290,
+        "PortScan": 2092,
+        "DoS": 1162,
+        "FTP-Patator": 64,
+        "SSH-Patator": 42,
+        "Web Attack \ufffd Brute Force": 39,
+        "Bot": 38,
+        "Web Attack \ufffd XSS": 15,
+        "Infiltration": 7,
+        "Web Attack \ufffd Sql Injection": 4,
+        "Heartbleed": 2
+    },
+    "classification_report": {
+        "BENIGN": {
+            "precision": 0.9983308163103092,
+            "recall": 0.9987674446344081,
+            "f1-score": 0.9985490827420349,
+            "support": 25151.0
+        },
+        "Bot": {
+            "precision": 0.9117647058823529,
+            "recall": 0.8157894736842105,
+            "f1-score": 0.8611111111111112,
+            "support": 38.0
+        },
+        "DDoS": {
+            "precision": 1.0,
+            "recall": 0.9995633187772925,
+            "f1-score": 0.9997816117056125,
+            "support": 2290.0
+        },
+        "DoS": {
+            "precision": 0.9948186528497409,
+            "recall": 0.9913941480206541,
+            "f1-score": 0.993103448275862,
+            "support": 1162.0
+        },
+        "FTP-Patator": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 64.0
+        },
+        "Heartbleed": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 2.0
+        },
+        "Infiltration": {
+            "precision": 1.0,
+            "recall": 0.5714285714285714,
+            "f1-score": 0.7272727272727273,
+            "support": 7.0
+        },
+        "PortScan": {
+            "precision": 0.9919163100332857,
+            "recall": 0.997131931166348,
+            "f1-score": 0.9945172824791418,
+            "support": 2092.0
+        },
+        "SSH-Patator": {
+            "precision": 1.0,
+            "recall": 0.9761904761904762,
+            "f1-score": 0.9879518072289156,
+            "support": 42.0
+        },
+        "Web Attack \ufffd Brute Force": {
+            "precision": 0.6410256410256411,
+            "recall": 0.6410256410256411,
+            "f1-score": 0.6410256410256411,
+            "support": 39.0
+        },
+        "Web Attack \ufffd Sql Injection": {
+            "precision": 0.5,
+            "recall": 0.25,
+            "f1-score": 0.3333333333333333,
+            "support": 4.0
+        },
+        "Web Attack \ufffd XSS": {
+            "precision": 0.375,
+            "recall": 0.2,
+            "f1-score": 0.2608695652173913,
+            "support": 15.0
+        },
+        "accuracy": 0.9971526564421148,
+        "macro avg": {
+            "precision": 0.8677380105084441,
+            "recall": 0.7867742504106333,
+            "f1-score": 0.8164596341993143,
+            "support": 30906.0
+        },
+        "weighted avg": {
+            "precision": 0.9969701227931518,
+            "recall": 0.9971526564421148,
+            "f1-score": 0.9970257463509359,
+            "support": 30906.0
+        }
+    }
+}
